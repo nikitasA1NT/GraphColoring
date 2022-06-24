@@ -1,19 +1,15 @@
 #include "Graph.h"
 
-Graph::Vertex::Vertex(int id, int color) {
-    this->id = id;
-    this->color = color;
-}
+#include <utility>
+#include <thread>
+#include <iostream>
 
-Graph::Vertex::~Vertex() {
+Graph::Vertex::Vertex(int id) {
+    this->id = id;
 }
 
 int Graph::Vertex::getId() const {
     return id;
-}
-
-int Graph::Vertex::getColor() const {
-    return color;
 }
 
 // Добавить соседей к вершине
@@ -21,15 +17,10 @@ void Graph::Vertex::addNeighbor(Graph::Vertex *neighbor) {
     neighbors.push_back(neighbor);
 }
 
-// Установка цвета вершины
-void Graph::Vertex::setColor(int color) {
-    this->color = color;
-}
-
 // Конструктор графа по входящему списку смежности
 Graph::Graph(const std::vector<std::vector<int>> &adjacencyList) {
     for (int i = 0; i < adjacencyList.size(); i++) {
-        Vertex* vertex = new Vertex(i + 1, -1);
+        Vertex* vertex = new Vertex(i + 1);
         vertices.push_back(vertex);
     }
 
@@ -64,19 +55,25 @@ int Graph::ChromaticNumber() {
     // Перебор числа цветов
     bool resultFound = false;
     for (int colorsAmount = 1; colorsAmount < vertices.size() && !resultFound; ++colorsAmount) {
-        // Сброс цветов к значению по умолчанию
-        resetColors();
 
-        // Рекурсивная функция перебора всех возможных раскрасок
-        coloringOptionsEnumeration(0, colorsAmount, chromaticNumber, resultFound);
+        std::vector<int> colorsOfVertices(vertices.size(), -1);
+
+        // Поток, принимающий лямбда-функцию с телом, которое будет выполняться в новом потоке
+        std::thread th([&]() {
+            // Рекурсивная функция перебора всех возможных раскрасок
+            coloringOptionsEnumeration(0, colorsAmount, colorsOfVertices,
+                                       chromaticNumber, resultFound);
+//            std::cout << "thread: " << th.get_id() << std::endl;
+        });
+
+        th.join();
     }
-
-    resetColors();
 
     return chromaticNumber;
 }
 
-void Graph::coloringOptionsEnumeration(int vertexIndex, int colorsAmount, int& result, bool& resultFound) {
+void Graph::coloringOptionsEnumeration(int vertexIndex, int colorsAmount, std::vector<int>& colorsOfVertices,
+                                       int& result, bool& resultFound) {
     // Завершить другие потоки, если результат найден
     if (resultFound) {
         return;
@@ -86,13 +83,12 @@ void Graph::coloringOptionsEnumeration(int vertexIndex, int colorsAmount, int& r
     if (vertexIndex == vertices.size()) {
 
         // Проверка, все ли ребра графа имеют на концах разные цвета
-        if (allEdgesHaveDifferentColors()) {
-
-            // Критическая секция ////////////////////////////////////
+        if (allEdgesHaveDifferentColors(colorsOfVertices)) {
+            // Критическая секция
+            mtx.lock();
             result = colorsAmount;
             resultFound = true;
-            //////////////////////////////////////////////////////////
-
+            mtx.unlock();
         }
 
         return;
@@ -100,32 +96,29 @@ void Graph::coloringOptionsEnumeration(int vertexIndex, int colorsAmount, int& r
 
     // Рекурсивный перебор раскрасок вершин
     for (int currentColor = 0; currentColor < colorsAmount; ++currentColor) {
-        vertices[vertexIndex]->setColor(currentColor);  // Установка цвета
-        coloringOptionsEnumeration(vertexIndex + 1, colorsAmount, result, resultFound);  // К следующей вершине
+        // Установка цвета
+        colorsOfVertices[vertexIndex] = currentColor;
+        // К следующей вершине
+        coloringOptionsEnumeration(vertexIndex + 1, colorsAmount, colorsOfVertices,
+                                   result, resultFound);
     }
 }
 
 // Возвращает правду, если две вершины имеют одинаковые цвета (ребро имеет одинаковые конци)
-bool Graph::isEqualColorsInEdge(Graph::Vertex *vertex1, Graph::Vertex *vertex2) const {
-    return vertex1->getColor() == vertex2->getColor();
+bool Graph::isEqualColorsInEdge(Graph::Vertex *vertex1, Graph::Vertex *vertex2,
+                                const std::vector<int>& colorsOfVertices) {
+    return colorsOfVertices[vertex1->getId() - 1] == colorsOfVertices[vertex2->getId() - 1];
 }
 
 // Возвращает правду, все ребра графа имеют разные концы
-bool Graph::allEdgesHaveDifferentColors() const {
+bool Graph::allEdgesHaveDifferentColors(const std::vector<int>& colorsOfVertices) {
     // Перебор всех существуеющих ребер в графе
     for (int i = 0; i < vertices.size(); i++) {
         for (int j = 0; j < vertices[i]->neighbors.size(); j++) {
-            if (isEqualColorsInEdge(vertices[i], vertices[i]->neighbors[j])) {
+            if (isEqualColorsInEdge(vertices[i], vertices[i]->neighbors[j], colorsOfVertices)) {
                 return false;
             }
         }
     }
     return true;
-}
-
-// Сброс цветов вершин
-void Graph::resetColors() {
-    for (int i = 0; i < vertices.size(); i++) {
-        vertices[i]->setColor(-1);
-    }
 }

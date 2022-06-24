@@ -2,6 +2,7 @@
 #define GRAPHCOLORING_GRAPH_H
 
 #include <vector>
+#include <mutex>
 
 // Graph class with list of nodes
 class Graph {
@@ -21,27 +22,16 @@ private:
     private:
         // Vertex id
         int id;
-        // Vertex color
-        int color;
 
     public:
         // Constructor
-        Vertex(int id, int color);
-
-        // Destructor
-        ~Vertex();
+        Vertex(int id);
 
         // Add neighbor
         void addNeighbor(Vertex* neighbor);
 
         // Getter for id
         int getId() const;
-
-        // Getter for color
-        int getColor() const;
-
-        // Setter for color
-        void setColor(int color);
 
         // Vertex neighbors
         std::vector<Vertex*> neighbors;
@@ -54,15 +44,17 @@ private:
     Vertex* findVertex(int id) const;
 
     // Is equal colors in two vertices
-    bool isEqualColorsInEdge(Vertex* vertex1, Vertex* vertex2) const;
+    static bool isEqualColorsInEdge(Vertex* vertex1, Vertex* vertex2, const std::vector<int>& colorsOfVertices) ;
 
     // All edges have different colors
-    bool allEdgesHaveDifferentColors() const;
+    bool allEdgesHaveDifferentColors(const std::vector<int>& colorsOfVertices);
 
-    void coloringOptionsEnumeration(int vertexIndex, int colorsAmount, int& result, bool& resultWasFound);
+    // Мьютекс для функции coloringOptionsEnumeration
+    std::mutex mtx;
 
-    // Reset colors of all vertices
-    void resetColors();
+    // Рекурсивная функция перебора всех возможных раскрасок
+    void coloringOptionsEnumeration(int vertexIndex, int colorsAmount, std::vector<int>& colorsOfVertices,
+                                    int& result, bool& resultWasFound);
 };
 
 
