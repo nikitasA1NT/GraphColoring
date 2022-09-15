@@ -1,6 +1,5 @@
 #include "Graph.h"
 
-#include <utility>
 #include <thread>
 #include <iostream>
 
@@ -54,19 +53,19 @@ int Graph::ChromaticNumber() {
 
     // Перебор числа цветов
     bool resultFound = false;
-    for (int colorsAmount = 1; colorsAmount < vertices.size() && !resultFound; ++colorsAmount) {
-
-        std::vector<int> colorsOfVertices(vertices.size(), -1);
+    for (int colorsAmount = 1; colorsAmount < vertices.size(); ++colorsAmount) {
 
         // Поток, принимающий лямбда-функцию с телом, которое будет выполняться в новом потоке
         std::thread th([&]() {
+            // Вектор хранит цвета вершин графа (индекс цвета в векторе соответствует ID вершины)
+            std::vector<int> colorsOfVertices(vertices.size(), -1);
+
             // Рекурсивная функция перебора всех возможных раскрасок
             coloringOptionsEnumeration(0, colorsAmount, colorsOfVertices,
                                        chromaticNumber, resultFound);
-//            std::cout << "thread: " << th.get_id() << std::endl;
         });
 
-        th.join();
+        th.join();  // Выполнить все потоки до завершения текущего метода
     }
 
     return chromaticNumber;
@@ -74,8 +73,8 @@ int Graph::ChromaticNumber() {
 
 void Graph::coloringOptionsEnumeration(int vertexIndex, int colorsAmount, std::vector<int>& colorsOfVertices,
                                        int& result, bool& resultFound) {
-    // Завершить другие потоки, если результат найден
-    if (resultFound) {
+    // Завершить другие потоки, если результат найден и текущее количество цветов больше этого найденного результата
+    if (resultFound && colorsAmount >= result) {
         return;
     }
 
@@ -86,8 +85,12 @@ void Graph::coloringOptionsEnumeration(int vertexIndex, int colorsAmount, std::v
         if (allEdgesHaveDifferentColors(colorsOfVertices)) {
             // Критическая секция
             mtx.lock();
+
             result = colorsAmount;
             resultFound = true;
+            /*std::cout << "thread: " << std::this_thread::get_id() << " "
+            << "current result " << result << std::endl;*/
+
             mtx.unlock();
         }
 

@@ -51,7 +51,6 @@ private:
 
     // Мьютекс для функции coloringOptionsEnumeration
     std::mutex mtx;
-
     // Рекурсивная функция перебора всех возможных раскрасок
     void coloringOptionsEnumeration(int vertexIndex, int colorsAmount, std::vector<int>& colorsOfVertices,
                                     int& result, bool& resultWasFound);
